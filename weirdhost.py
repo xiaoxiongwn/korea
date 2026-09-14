@@ -219,27 +219,42 @@ class WeirdHostRenewal:
                 #self.send_telegram_notify(f"进入服务器 {NUM} 面板", server_screenshot)
 
                 # 6. 判断续期按钮是否可点并点击
-                sb.scroll_to_bottom() # 滚动到底部
+                sb.scroll_to_bottom()
                 self.log("⏳ 开始检查续期按钮是否可以点击")
-                status_element = sb.find_element('p[class*="StatusText"]')
-                status_text = status_element.text.strip()
+                # 不再依赖 StatusText CSS 类名，直接读取页面文字
+                page_text = sb.get_text("body").strip()
 
-                if not "지금 연장이 가능해요" in status_text:
-                    page_text = sb.get_text("body")
+                if "지금 연장이 가능해요" not in page_text:
+                    self.log("⏳ 当前续期按钮处于冷却状态")
+
                     timestamp_pattern = r'\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}'
-                    match_days = re.search(timestamp_pattern, page_text, re.IGNORECASE)
-                    timestamp = match_days.group(0)
+                    match_days = re.search(timestamp_pattern, page_text)
+
+                    if match_days:
+                        timestamp = match_days.group(0)
+                    else:
+                        timestamp = "未找到到期时间"
+
                     final_screenshot = f"{self.screenshot_dir}/final.png"
                     sb.save_screenshot(final_screenshot)
-                    msg = f"🎉WeirdHost-家宽 续期按钮冷却中\n⏳服务器到期时间：{timestamp}"
+
+                    msg = (
+                        f"🎉WeirdHost-家宽 续期按钮冷却中\n"
+                        f"⏳服务器到期时间：{timestamp}"
+                    )
+
                     self.log(msg)
                     self.send_telegram_notify(msg, final_screenshot)
                     return
 
-                self.log("✅ 续期按钮可点击")
+                self.log("✅ 检测到「지금 연장이 가능해요」，续期按钮可以点击")
+
+                # 根据按钮文字定位
                 btn = '//button[contains(normalize-space(.), "연장하기")]'
-                sb.wait_for_element_visible(btn, timeout=10)
+
+                sb.wait_for_element_visible(btn, timeout=15)
                 sb.click(btn)
+
                 self.log("✅ 已点击 연장하기")
                 time.sleep(10)
                 #renew_screenshot = f"{self.screenshot_dir}/renew.png"
